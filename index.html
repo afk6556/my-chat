@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Мессенджер с голосовыми</title>
+  <title>Мессенджер с видео-кружками 🎥🔔</title>
   <style>
     body { font-family: sans-serif; max-width: 500px; margin: 20px auto; padding: 0 15px; }
     #messages { border: 1px solid #ccc; border-radius: 8px; height: 400px; overflow-y: auto; padding: 10px; margin-bottom: 10px; background: #fafafa; }
     .msg { margin-bottom: 10px; line-height: 1.4; }
     .msg strong { color: #0077cc; }
-    .voice-msg audio { width: 100%; max-width: 250px; margin-top: 4px; }
-    .voice-msg .duration { color: #888; font-size: 0.85em; margin-left: 5px; }
+    .voice-msg audio, .video-msg video { width: 100%; max-width: 250px; margin-top: 4px; }
+    .voice-msg .duration, .video-msg .duration { color: #888; font-size: 0.85em; margin-left: 5px; }
 
-    .input-area { display: flex; align-items: center; gap: 5px; margin-bottom: 10px; }
+    .input-area { display: flex; align-items: center; gap: 5px; margin-bottom: 10px; flex-wrap: wrap; }
     #name-input { width: 100px; }
-    #msg-input { flex: 1; }
+    #msg-input { flex: 1; min-width: 120px; }
     button { padding: 10px 15px; font-size: 16px; border: none; border-radius: 6px; cursor: pointer; background: #eee; }
     button:active { background: #ddd; }
 
@@ -26,6 +26,8 @@
       border-radius: 50%;
       transition: background 0.2s;
       user-select: none;
+      border: none;
+      cursor: pointer;
     }
     .record-btn.recording {
       background: #ff4444;
@@ -40,22 +42,26 @@
     #timer { font-size: 0.9em; color: #888; min-width: 40px; text-align: center; }
 
     .error { color: #d00; font-size: 0.8em; margin: 5px 0; }
+    #notification-status { font-size: 0.8em; color: #888; margin-left: 5px; }
   </style>
 </head>
 <body>
-  <h2>Мой мессенджер 🎤</h2>
+  <h2>Мой мессенджер 🎤📹🔔</h2>
   <div>
     <label>Твоё имя: <input type="text" id="name-input" placeholder="Ник" maxlength="20"></label>
+    <span id="notification-status"></span>
   </div>
   <div id="messages"></div>
 
   <div class="input-area">
     <input type="text" id="msg-input" placeholder="Сообщение..." maxlength="500">
     <button onclick="sendMessage()">Отпр.</button>
-    <button class="record-btn" id="record-btn" title="Удерживайте для записи голосового">🎤</button>
+    <button class="record-btn" id="voice-btn" title="Удерживайте для записи голосового">🎤</button>
+    <button class="record-btn" id="video-btn" title="Удерживайте для записи видео">📹</button>
     <span id="timer"></span>
   </div>
   <div id="mic-error" class="error"></div>
+  <div id="cam-error" class="error"></div>
 
   <!-- Firebase SDK -->
   <script type="module">
@@ -78,29 +84,53 @@ const firebaseConfig = {
     const db = getDatabase(app);
     const messagesRef = ref(db, 'messages');
 
-    // ---------- РАБОТА С СООБЩЕНИЯМИ (ТЕКСТ + ГОЛОС) ----------
+    // ---------- УВЕДОМЛЕНИЯ ----------
+    const notifStatus = document.getElementById('notification-status');
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') {
+        notifStatus.textContent = '🔔 Уведомления включены';
+      } else if (Notification.permission === 'denied') {
+        notifStatus.textContent = '🔕 Уведомления запрещены';
+      } else {
+        notifStatus.textContent = '🔔 Разрешить уведомления?';
+        Notification.requestPermission().then(perm => {
+          if (perm === 'granted') {
+            notifStatus.textContent = '🔔 Уведомления включены';
+          } else {
+            notifStatus.textContent = '🔕 Уведомления запрещены';
+          }
+        });
+      }
+    } else {
+      notifStatus.textContent = '⚠️ Браузер не поддерживает уведомления';
+    }
+
+    // ---------- ПОЛУЧЕНИЕ СООБЩЕНИЙ + УВЕДОМЛЕНИЯ ----------
     onChildAdded(messagesRef, (snapshot) => {
       const msg = snapshot.val();
       displayMessage(msg);
+      if (document.hidden && Notification.permission === 'granted') {
+        showNotification(msg);
+      }
     });
 
     function displayMessage(msg) {
       const messagesDiv = document.getElementById('messages');
       const msgDiv = document.createElement('div');
       msgDiv.className = 'msg';
-
       const name = escapeHtml(msg.name || 'Аноним');
 
       if (msg.type === 'voice') {
-        // Голосовое сообщение
-        const audioSrc = msg.audioData; // base64 data URL
-        const duration = msg.duration || 0;
-        const durText = formatDuration(duration);
+        const durText = formatDuration(msg.duration || 0);
         msgDiv.innerHTML = `<strong>${name}:</strong> голосовое сообщение <span class="duration">${durText}</span><br>` +
-                           `<audio controls src="${audioSrc}"></audio>`;
+                           `<audio controls src="${msg.audioData}"></audio>`;
         msgDiv.classList.add('voice-msg');
+      } else if (msg.type === 'video') {
+        const durText = formatDuration(msg.duration || 0);
+        msgDiv.innerHTML = `<strong>${name}:</strong> видео-кружок <span class="duration">${durText}</span><br>` +
+                           `<video controls src="${msg.videoData}" width="250"></video>`;
+        msgDiv.classList.add('video-msg');
       } else {
-        // Обычное текстовое
         const text = escapeHtml(msg.text || '');
         msgDiv.innerHTML = `<strong>${name}:</strong> ${text}`;
       }
@@ -109,140 +139,211 @@ const firebaseConfig = {
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
-    // Отправка текста
+    function showNotification(msg) {
+      const name = msg.name || 'Аноним';
+      let body = '';
+      if (msg.type === 'voice') body = '🎤 Голосовое сообщение';
+      else if (msg.type === 'video') body = '🎥 Видео-кружок';
+      else body = msg.text || '';
+      const options = {
+        body: body,
+        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">💬</text></svg>',
+        tag: 'chat-msg'
+      };
+      new Notification(`${name}`, options);
+    }
+
     window.sendMessage = function() {
       const nameInput = document.getElementById('name-input');
       const msgInput = document.getElementById('msg-input');
       const name = nameInput.value.trim() || 'Аноним';
       const text = msgInput.value.trim();
       if (text === '') return;
-
-      push(messagesRef, {
-        name: name,
-        text: text,
-        type: 'text',
-        timestamp: Date.now()
-      });
-
+      push(messagesRef, { name, text, type: 'text', timestamp: Date.now() });
       msgInput.value = '';
     };
 
     // ---------- ЗАПИСЬ ГОЛОСА ----------
-    let mediaRecorder = null;
-    let audioChunks = [];
-    let recordStartTime = 0;
-    let recordTimerInterval = null;
-    let isRecording = false;
-    const MAX_RECORD_SEC = 60;
+    let voiceRecorder = null;
+    let voiceChunks = [];
+    let voiceStartTime = 0;
+    let voiceTimerInterval = null;
+    let isVoiceRecording = false;
+    const MAX_VOICE_SEC = 60;
 
-    const recordBtn = document.getElementById('record-btn');
+    const voiceBtn = document.getElementById('voice-btn');
     const timerSpan = document.getElementById('timer');
     const micErrorDiv = document.getElementById('mic-error');
 
-    // Проверим поддержку MediaRecorder
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      micErrorDiv.textContent = 'Ваш браузер не поддерживает запись аудио. Попробуйте Chrome, Firefox или Edge.';
-      recordBtn.style.display = 'none';
-    } else {
-      // Предварительный запрос доступа к микрофону (необязательно, но может сгладить задержку)
-      // Лучше делать по нажатию, чтобы не пугать пользователя. Сделаем при первом нажатии.
-    }
-
-    async function startRecording() {
-      if (isRecording) return;
+    async function startVoiceRecording() {
+      if (isVoiceRecording || isVideoRecording) return;
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Определим поддерживаемый mime-тип (желательно WebM с Opus)
         let mimeType = 'audio/webm;codecs=opus';
         if (!MediaRecorder.isTypeSupported(mimeType)) {
-          mimeType = 'audio/webm'; // fallback
+          mimeType = 'audio/webm';
           if (!MediaRecorder.isTypeSupported(mimeType)) {
             mimeType = 'audio/ogg;codecs=opus';
             if (!MediaRecorder.isTypeSupported(mimeType)) {
               mimeType = 'audio/mp4';
-              if (!MediaRecorder.isTypeSupported(mimeType)) {
-                mimeType = ''; // пусть браузер сам выберет
-              }
+              if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = '';
             }
           }
         }
-
         const options = mimeType ? { mimeType } : {};
-        mediaRecorder = new MediaRecorder(stream, options);
-        audioChunks = [];
-
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            audioChunks.push(event.data);
-          }
-        };
-
-        mediaRecorder.onstop = () => {
-          // Останавливаем все дорожки стрима, чтобы микрофон выключился
-          stream.getTracks().forEach(track => track.stop());
-          // Собираем blob и отправляем
-          if (audioChunks.length === 0) return;
-          const audioBlob = new Blob(audioChunks, { type: mimeType || 'audio/webm' });
+        voiceRecorder = new MediaRecorder(stream, options);
+        voiceChunks = [];
+        voiceRecorder.ondataavailable = (e) => { if (e.data.size > 0) voiceChunks.push(e.data); };
+        voiceRecorder.onstop = () => {
+          stream.getTracks().forEach(t => t.stop());
+          if (voiceChunks.length === 0) return;
+          const blob = new Blob(voiceChunks, { type: mimeType || 'audio/webm' });
           const reader = new FileReader();
           reader.onloadend = () => {
-            const base64data = reader.result; // data:audio/...;base64,...
-            const duration = Math.min((Date.now() - recordStartTime) / 1000, MAX_RECORD_SEC);
-            const nameInput = document.getElementById('name-input');
-            const name = nameInput.value.trim() || 'Аноним';
-            push(messagesRef, {
-              name: name,
-              type: 'voice',
-              audioData: base64data,
-              duration: duration,
-              timestamp: Date.now()
-            });
+            const base64 = reader.result;
+            const duration = Math.min((Date.now() - voiceStartTime) / 1000, MAX_VOICE_SEC);
+            const name = document.getElementById('name-input').value.trim() || 'Аноним';
+            push(messagesRef, { name, type: 'voice', audioData: base64, duration, timestamp: Date.now() });
           };
-          reader.readAsDataURL(audioBlob);
+          reader.readAsDataURL(blob);
         };
-
-        mediaRecorder.start();
-        isRecording = true;
-        recordStartTime = Date.now();
-        recordBtn.classList.add('recording');
-        recordBtn.textContent = '🔴';
+        voiceRecorder.start();
+        isVoiceRecording = true;
+        voiceStartTime = Date.now();
+        voiceBtn.classList.add('recording');
+        voiceBtn.textContent = '🔴';
         micErrorDiv.textContent = '';
-
-        // Запускаем таймер отображения длительности
-        updateTimer();
-        recordTimerInterval = setInterval(updateTimer, 200);
-
-        // Автостоп через MAX_RECORD_SEC
-        setTimeout(() => {
-          if (isRecording) {
-            stopRecording();
-          }
-        }, MAX_RECORD_SEC * 1000);
-
+        updateVoiceTimer();
+        voiceTimerInterval = setInterval(updateVoiceTimer, 200);
+        setTimeout(() => { if (isVoiceRecording) stopVoiceRecording(); }, MAX_VOICE_SEC * 1000);
       } catch (err) {
-        console.error(err);
-        micErrorDiv.textContent = 'Не удалось получить доступ к микрофону. Разрешите доступ в настройках браузера.';
-        recordBtn.classList.remove('recording');
-        recordBtn.textContent = '🎤';
-        isRecording = false;
+        micErrorDiv.textContent = 'Нет доступа к микрофону. Разрешите в настройках браузера.';
+        voiceBtn.classList.remove('recording');
+        voiceBtn.textContent = '🎤';
+        isVoiceRecording = false;
       }
     }
 
-    function stopRecording() {
-      if (!isRecording || !mediaRecorder || mediaRecorder.state === 'inactive') return;
-      mediaRecorder.stop();
-      isRecording = false;
-      recordBtn.classList.remove('recording');
-      recordBtn.textContent = '🎤';
-      clearInterval(recordTimerInterval);
-      recordTimerInterval = null;
+    function stopVoiceRecording() {
+      if (!isVoiceRecording || !voiceRecorder || voiceRecorder.state === 'inactive') return;
+      voiceRecorder.stop();
+      isVoiceRecording = false;
+      voiceBtn.classList.remove('recording');
+      voiceBtn.textContent = '🎤';
+      clearInterval(voiceTimerInterval);
+      voiceTimerInterval = null;
       timerSpan.textContent = '';
     }
 
-    function updateTimer() {
-      if (!isRecording) return;
-      const elapsed = Math.floor((Date.now() - recordStartTime) / 1000);
+    function updateVoiceTimer() {
+      if (!isVoiceRecording) return;
+      const elapsed = Math.floor((Date.now() - voiceStartTime) / 1000);
       timerSpan.textContent = `${elapsed}с`;
     }
+
+    // ---------- ЗАПИСЬ ВИДЕО (КРУЖКИ) ----------
+    let videoRecorder = null;
+    let videoChunks = [];
+    let videoStartTime = 0;
+    let videoTimerInterval = null;
+    let isVideoRecording = false;
+    const MAX_VIDEO_SEC = 30; // ограничение по размеру
+
+    const videoBtn = document.getElementById('video-btn');
+    const camErrorDiv = document.getElementById('cam-error');
+
+    async function startVideoRecording() {
+      if (isVoiceRecording || isVideoRecording) return;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 320, height: 240, facingMode: 'user' },
+          audio: true
+        });
+        let mimeType = 'video/webm;codecs=vp8,opus';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          mimeType = 'video/webm';
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'video/mp4';
+            if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = '';
+          }
+        }
+        const options = mimeType ? { mimeType } : {};
+        videoRecorder = new MediaRecorder(stream, options);
+        videoChunks = [];
+        videoRecorder.ondataavailable = (e) => { if (e.data.size > 0) videoChunks.push(e.data); };
+        videoRecorder.onstop = () => {
+          stream.getTracks().forEach(t => t.stop());
+          if (videoChunks.length === 0) return;
+          const blob = new Blob(videoChunks, { type: mimeType || 'video/webm' });
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64 = reader.result;
+            const duration = Math.min((Date.now() - videoStartTime) / 1000, MAX_VIDEO_SEC);
+            const name = document.getElementById('name-input').value.trim() || 'Аноним';
+            push(messagesRef, { name, type: 'video', videoData: base64, duration, timestamp: Date.now() });
+          };
+          reader.readAsDataURL(blob);
+        };
+        videoRecorder.start();
+        isVideoRecording = true;
+        videoStartTime = Date.now();
+        videoBtn.classList.add('recording');
+        videoBtn.textContent = '🔴';
+        camErrorDiv.textContent = '';
+        updateVideoTimer();
+        videoTimerInterval = setInterval(updateVideoTimer, 200);
+        setTimeout(() => { if (isVideoRecording) stopVideoRecording(); }, MAX_VIDEO_SEC * 1000);
+      } catch (err) {
+        camErrorDiv.textContent = 'Нет доступа к камере. Разрешите в настройках браузера.';
+        videoBtn.classList.remove('recording');
+        videoBtn.textContent = '📹';
+        isVideoRecording = false;
+      }
+    }
+
+    function stopVideoRecording() {
+      if (!isVideoRecording || !videoRecorder || videoRecorder.state === 'inactive') return;
+      videoRecorder.stop();
+      isVideoRecording = false;
+      videoBtn.classList.remove('recording');
+      videoBtn.textContent = '📹';
+      clearInterval(videoTimerInterval);
+      videoTimerInterval = null;
+      timerSpan.textContent = '';
+    }
+
+    function updateVideoTimer() {
+      if (!isVideoRecording) return;
+      const elapsed = Math.floor((Date.now() - videoStartTime) / 1000);
+      timerSpan.textContent = `${elapsed}с`;
+    }
+
+    // ---------- ОБРАБОТЧИКИ КНОПОК ----------
+    function attachVoiceEvents() {
+      voiceBtn.addEventListener('mousedown', (e) => { e.preventDefault(); startVoiceRecording(); });
+      voiceBtn.addEventListener('mouseup', (e) => { e.preventDefault(); stopVoiceRecording(); });
+      voiceBtn.addEventListener('mouseleave', (e) => { if (isVoiceRecording) stopVoiceRecording(); });
+      voiceBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startVoiceRecording(); });
+      voiceBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopVoiceRecording(); });
+      voiceBtn.addEventListener('touchcancel', (e) => { if (isVoiceRecording) stopVoiceRecording(); });
+    }
+
+    function attachVideoEvents() {
+      videoBtn.addEventListener('mousedown', (e) => { e.preventDefault(); startVideoRecording(); });
+      videoBtn.addEventListener('mouseup', (e) => { e.preventDefault(); stopVideoRecording(); });
+      videoBtn.addEventListener('mouseleave', (e) => { if (isVideoRecording) stopVideoRecording(); });
+      videoBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startVideoRecording(); });
+      videoBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopVideoRecording(); });
+      videoBtn.addEventListener('touchcancel', (e) => { if (isVideoRecording) stopVideoRecording(); });
+    }
+
+    attachVoiceEvents();
+    attachVideoEvents();
+
+    // Enter для отправки текста
+    document.getElementById('msg-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') window.sendMessage();
+    });
 
     function formatDuration(seconds) {
       seconds = Math.floor(seconds);
@@ -252,52 +353,8 @@ const firebaseConfig = {
       return `0:${secs.toString().padStart(2, '0')}`;
     }
 
-    // ---------- ОБРАБОТЧИКИ КНОПКИ ЗАПИСИ (мышь + тач) ----------
-    function attachRecordEvents() {
-      // Мышь
-      recordBtn.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        startRecording();
-      });
-      recordBtn.addEventListener('mouseup', (e) => {
-        e.preventDefault();
-        stopRecording();
-      });
-      recordBtn.addEventListener('mouseleave', (e) => {
-        // Если ушли с кнопки во время записи — остановить
-        if (isRecording) stopRecording();
-      });
-
-      // Тач (мобильные)
-      recordBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        startRecording();
-      });
-      recordBtn.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        stopRecording();
-      });
-      recordBtn.addEventListener('touchcancel', (e) => {
-        if (isRecording) stopRecording();
-      });
-    }
-
-    attachRecordEvents();
-
-    // Enter для текстового поля
-    document.getElementById('msg-input').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') window.sendMessage();
-    });
-
-    // Вспомогательные функции
     function escapeHtml(text) {
-      const map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-      };
+      const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
       return text.replace(/[&<>"']/g, m => map[m]);
     }
   </script>
