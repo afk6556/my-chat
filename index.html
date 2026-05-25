@@ -3,73 +3,287 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Мессенджер с видео-кружками 🎥🔔</title>
+  <title>Мессенджер • Видеокружки</title>
   <style>
-    body { font-family: sans-serif; max-width: 500px; margin: 20px auto; padding: 0 15px; }
-    #messages { border: 1px solid #ccc; border-radius: 8px; height: 400px; overflow-y: auto; padding: 10px; margin-bottom: 10px; background: #fafafa; }
-    .msg { margin-bottom: 10px; line-height: 1.4; }
-    .msg strong { color: #0077cc; }
-    .voice-msg audio, .video-msg video { width: 100%; max-width: 250px; margin-top: 4px; }
-    .voice-msg .duration, .video-msg .duration { color: #888; font-size: 0.85em; margin-left: 5px; }
-
-    .input-area { display: flex; align-items: center; gap: 5px; margin-bottom: 10px; flex-wrap: wrap; }
-    #name-input { width: 100px; }
-    #msg-input { flex: 1; min-width: 120px; }
-    button { padding: 10px 15px; font-size: 16px; border: none; border-radius: 6px; cursor: pointer; background: #eee; }
-    button:active { background: #ddd; }
-
-    .record-btn {
-      background: #f0f0f0;
-      font-size: 20px;
-      width: 48px; height: 48px;
-      display: flex; align-items: center; justify-content: center;
-      border-radius: 50%;
-      transition: background 0.2s;
-      user-select: none;
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .messenger {
+      width: 100%;
+      max-width: 480px;
+      height: 90vh;
+      max-height: 800px;
+      background: white;
+      border-radius: 32px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+    .header {
+      background: white;
+      padding: 20px;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .header h2 {
+      font-size: 22px;
+      font-weight: 600;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .name-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #name-input {
+      border: 2px solid #e8ecf1;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 15px;
+      width: 110px;
+      outline: none;
+      transition: border 0.3s;
+    }
+    #name-input:focus {
+      border-color: #667eea;
+    }
+    .notification-toggle {
+      background: #f5f7fa;
       border: none;
+      border-radius: 12px;
+      padding: 10px;
+      font-size: 18px;
       cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      line-height: 1;
+    }
+    .notification-toggle:hover {
+      background: #e8ecf1;
+      transform: scale(1.05);
+    }
+    .notification-toggle.active {
+      background: #e8ecf1;
+    }
+    .messages-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      background: #fafbfc;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .msg {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 16px;
+      flex-shrink: 0;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .bubble {
+      background: white;
+      padding: 12px 16px;
+      border-radius: 20px 20px 20px 4px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      max-width: 75%;
+      word-wrap: break-word;
+    }
+    .bubble .sender {
+      font-weight: 600;
+      color: #667eea;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+    .bubble .text {
+      color: #2d3436;
+      font-size: 15px;
+      line-height: 1.4;
+    }
+    .bubble audio,
+    .bubble video {
+      display: block;
+      margin-top: 6px;
+      width: 100%;
+      border-radius: 12px;
+      outline: none;
+    }
+    .bubble .duration {
+      font-size: 12px;
+      color: #888;
+      margin-left: 6px;
+    }
+    .input-area {
+      background: white;
+      padding: 15px 20px;
+      border-top: 1px solid #f0f0f0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    #msg-input {
+      flex: 1;
+      border: 2px solid #e8ecf1;
+      border-radius: 24px;
+      padding: 12px 20px;
+      font-size: 15px;
+      outline: none;
+      transition: border 0.3s;
+      min-width: 120px;
+    }
+    #msg-input:focus {
+      border-color: #667eea;
+    }
+    .action-btn {
+      background: #f5f7fa;
+      border: none;
+      border-radius: 24px;
+      padding: 12px 18px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .action-btn:hover {
+      background: #e8ecf1;
+      transform: translateY(-1px);
+    }
+    .record-btn {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: #f5f7fa;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .record-btn:hover {
+      background: #e8ecf1;
     }
     .record-btn.recording {
-      background: #ff4444;
+      background: #ff4757;
       color: white;
-      animation: pulse 1s infinite;
+      animation: pulse 1.2s infinite;
+      box-shadow: 0 0 0 0 rgba(255,71,87,0.5);
     }
     @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(255,68,68,0.5); }
-      70% { box-shadow: 0 0 0 12px rgba(255,68,68,0); }
-      100% { box-shadow: 0 0 0 0 rgba(255,68,68,0); }
+      0% { box-shadow: 0 0 0 0 rgba(255,71,87,0.7); }
+      70% { box-shadow: 0 0 0 12px rgba(255,71,87,0); }
+      100% { box-shadow: 0 0 0 0 rgba(255,71,87,0); }
     }
-    #timer { font-size: 0.9em; color: #888; min-width: 40px; text-align: center; }
-
-    .error { color: #d00; font-size: 0.8em; margin: 5px 0; }
-    #notification-status { font-size: 0.8em; color: #888; margin-left: 5px; }
+    .timer {
+      font-size: 14px;
+      color: #888;
+      min-width: 35px;
+      text-align: center;
+      font-weight: 500;
+    }
+    .preview-container {
+      position: absolute;
+      bottom: 100px;
+      right: 20px;
+      width: 120px;
+      height: 160px;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      background: #000;
+      z-index: 10;
+      display: none;
+      border: 3px solid white;
+    }
+    .preview-container video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .error-msg {
+      color: #ff4757;
+      font-size: 13px;
+      margin: 5px 10px;
+    }
   </style>
 </head>
 <body>
-  <h2>Мой мессенджер 🎤📹🔔</h2>
-  <div>
-    <label>Твоё имя: <input type="text" id="name-input" placeholder="Ник" maxlength="20"></label>
-    <span id="notification-status"></span>
+<div class="messenger">
+  <div class="header">
+    <h2>💬 Чат</h2>
+    <div class="name-row">
+      <input type="text" id="name-input" placeholder="Твоё имя" maxlength="20" value="Гость">
+      <button class="notification-toggle" id="notif-toggle" title="Уведомления">🔔</button>
+    </div>
   </div>
-  <div id="messages"></div>
+
+  <div class="messages-container" id="messages"></div>
 
   <div class="input-area">
     <input type="text" id="msg-input" placeholder="Сообщение..." maxlength="500">
-    <button onclick="sendMessage()">Отпр.</button>
-    <button class="record-btn" id="voice-btn" title="Удерживайте для записи голосового">🎤</button>
-    <button class="record-btn" id="video-btn" title="Удерживайте для записи видео">📹</button>
-    <span id="timer"></span>
+    <button class="action-btn" onclick="sendMessage()">✉️</button>
+    <button class="record-btn" id="voice-btn" title="Голосовое">🎤</button>
+    <button class="record-btn" id="video-btn" title="Видеокружок">📹</button>
+    <span class="timer" id="timer"></span>
   </div>
-  <div id="mic-error" class="error"></div>
-  <div id="cam-error" class="error"></div>
+  <div id="mic-error" class="error-msg"></div>
+  <div id="cam-error" class="error-msg"></div>
+  <div class="preview-container" id="preview-container">
+    <video id="preview-video" autoplay muted playsinline></video>
+  </div>
+</div>
 
-  <!-- Firebase SDK -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-    import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+  import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
 
-    // =========== ВСТАВЬ СЮДА СВОЙ КОНФИГ ===========
-const firebaseConfig = {
+  // =========== ВСТАВЬ СЮДА СВОЙ КОНФИГ ==========
+  const firebaseConfig = {
   apiKey: "AIzaSyAlnrJNNmsfH2NhphvYN50i_GtlSgGUC30",
   authDomain: "fftf-6d8d0.firebaseapp.com",
   databaseURL: "https://fftf-6d8d0-default-rtdb.europe-west1.firebasedatabase.app",
@@ -78,285 +292,287 @@ const firebaseConfig = {
   messagingSenderId: "467091018122",
   appId: "1:467091018122:web:2988d7028cf571b45df873"
 };
-    // =================================================
+  // =================================================
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    const messagesRef = ref(db, 'messages');
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const messagesRef = ref(db, 'messages');
 
-    // ---------- УВЕДОМЛЕНИЯ ----------
-    const notifStatus = document.getElementById('notification-status');
-    if ('Notification' in window) {
-      if (Notification.permission === 'granted') {
-        notifStatus.textContent = '🔔 Уведомления включены';
-      } else if (Notification.permission === 'denied') {
-        notifStatus.textContent = '🔕 Уведомления запрещены';
-      } else {
-        notifStatus.textContent = '🔔 Разрешить уведомления?';
-        Notification.requestPermission().then(perm => {
-          if (perm === 'granted') {
-            notifStatus.textContent = '🔔 Уведомления включены';
-          } else {
-            notifStatus.textContent = '🔕 Уведомления запрещены';
-          }
-        });
-      }
+  // ---------- УВЕДОМЛЕНИЯ (управление) ----------
+  const notifToggle = document.getElementById('notif-toggle');
+  const notifStorageKey = 'notifications_enabled';
+  let notificationsEnabled = localStorage.getItem(notifStorageKey) !== 'false'; // по умолчанию true
+
+  function updateNotifUI() {
+    if (notificationsEnabled) {
+      notifToggle.classList.add('active');
+      notifToggle.innerHTML = '🔔';
     } else {
-      notifStatus.textContent = '⚠️ Браузер не поддерживает уведомления';
+      notifToggle.classList.remove('active');
+      notifToggle.innerHTML = '🔕';
     }
+  }
+  updateNotifUI();
 
-    // ---------- ПОЛУЧЕНИЕ СООБЩЕНИЙ + УВЕДОМЛЕНИЯ ----------
-    onChildAdded(messagesRef, (snapshot) => {
-      const msg = snapshot.val();
-      displayMessage(msg);
-      if (document.hidden && Notification.permission === 'granted') {
-        showNotification(msg);
-      }
-    });
-
-    function displayMessage(msg) {
-      const messagesDiv = document.getElementById('messages');
-      const msgDiv = document.createElement('div');
-      msgDiv.className = 'msg';
-      const name = escapeHtml(msg.name || 'Аноним');
-
-      if (msg.type === 'voice') {
-        const durText = formatDuration(msg.duration || 0);
-        msgDiv.innerHTML = `<strong>${name}:</strong> голосовое сообщение <span class="duration">${durText}</span><br>` +
-                           `<audio controls src="${msg.audioData}"></audio>`;
-        msgDiv.classList.add('voice-msg');
-      } else if (msg.type === 'video') {
-        const durText = formatDuration(msg.duration || 0);
-        msgDiv.innerHTML = `<strong>${name}:</strong> видео-кружок <span class="duration">${durText}</span><br>` +
-                           `<video controls src="${msg.videoData}" width="250"></video>`;
-        msgDiv.classList.add('video-msg');
+  notifToggle.addEventListener('click', async () => {
+    if (notificationsEnabled) {
+      // Отключаем
+      notificationsEnabled = false;
+      localStorage.setItem(notifStorageKey, 'false');
+      updateNotifUI();
+    } else {
+      // Включаем: если разрешение не получено, запрашиваем
+      if ('Notification' in window && Notification.permission !== 'granted') {
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+          notificationsEnabled = true;
+        }
+      } else if ('Notification' in window && Notification.permission === 'granted') {
+        notificationsEnabled = true;
       } else {
-        const text = escapeHtml(msg.text || '');
-        msgDiv.innerHTML = `<strong>${name}:</strong> ${text}`;
+        alert('Разрешение на уведомления не получено.');
+        return;
       }
+      localStorage.setItem(notifStorageKey, 'true');
+      updateNotifUI();
+    }
+  });
 
-      messagesDiv.appendChild(msgDiv);
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  // ---------- ПОЛУЧЕНИЕ СООБЩЕНИЙ + УВЕДОМЛЕНИЯ ----------
+  onChildAdded(messagesRef, (snapshot) => {
+    const msg = snapshot.val();
+    displayMessage(msg);
+    if (document.hidden && notificationsEnabled && Notification.permission === 'granted') {
+      showNotification(msg);
+    }
+  });
+
+  function displayMessage(msg) {
+    const container = document.getElementById('messages');
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'msg';
+
+    const name = escapeHtml(msg.name || 'Аноним');
+    const initial = name.charAt(0).toUpperCase();
+
+    // Аватар
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    avatar.textContent = initial;
+
+    // Пузырь
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    let content = `<div class="sender">${name}</div>`;
+
+    if (msg.type === 'voice') {
+      const durText = formatDuration(msg.duration || 0);
+      content += `<span class="text">🎤 Голосовое <span class="duration">${durText}</span></span>`;
+      content += `<audio controls src="${msg.audioData}"></audio>`;
+    } else if (msg.type === 'video') {
+      const durText = formatDuration(msg.duration || 0);
+      content += `<span class="text">📹 Видео <span class="duration">${durText}</span></span>`;
+      // Используем видеоплеер с атрибутом preload, чтобы гарантировать отображение
+      content += `<video controls src="${msg.videoData}" preload="metadata" style="width:100%; border-radius:12px;"></video>`;
+    } else {
+      content += `<div class="text">${escapeHtml(msg.text || '')}</div>`;
     }
 
-    function showNotification(msg) {
-      const name = msg.name || 'Аноним';
-      let body = '';
-      if (msg.type === 'voice') body = '🎤 Голосовое сообщение';
-      else if (msg.type === 'video') body = '🎥 Видео-кружок';
-      else body = msg.text || '';
-      const options = {
-        body: body,
-        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">💬</text></svg>',
-        tag: 'chat-msg'
-      };
-      new Notification(`${name}`, options);
-    }
+    bubble.innerHTML = content;
+    msgDiv.appendChild(avatar);
+    msgDiv.appendChild(bubble);
+    container.appendChild(msgDiv);
+    container.scrollTop = container.scrollHeight;
+  }
 
-    window.sendMessage = function() {
-      const nameInput = document.getElementById('name-input');
-      const msgInput = document.getElementById('msg-input');
-      const name = nameInput.value.trim() || 'Аноним';
-      const text = msgInput.value.trim();
-      if (text === '') return;
-      push(messagesRef, { name, text, type: 'text', timestamp: Date.now() });
-      msgInput.value = '';
-    };
-
-    // ---------- ЗАПИСЬ ГОЛОСА ----------
-    let voiceRecorder = null;
-    let voiceChunks = [];
-    let voiceStartTime = 0;
-    let voiceTimerInterval = null;
-    let isVoiceRecording = false;
-    const MAX_VOICE_SEC = 60;
-
-    const voiceBtn = document.getElementById('voice-btn');
-    const timerSpan = document.getElementById('timer');
-    const micErrorDiv = document.getElementById('mic-error');
-
-    async function startVoiceRecording() {
-      if (isVoiceRecording || isVideoRecording) return;
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        let mimeType = 'audio/webm;codecs=opus';
-        if (!MediaRecorder.isTypeSupported(mimeType)) {
-          mimeType = 'audio/webm';
-          if (!MediaRecorder.isTypeSupported(mimeType)) {
-            mimeType = 'audio/ogg;codecs=opus';
-            if (!MediaRecorder.isTypeSupported(mimeType)) {
-              mimeType = 'audio/mp4';
-              if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = '';
-            }
-          }
-        }
-        const options = mimeType ? { mimeType } : {};
-        voiceRecorder = new MediaRecorder(stream, options);
-        voiceChunks = [];
-        voiceRecorder.ondataavailable = (e) => { if (e.data.size > 0) voiceChunks.push(e.data); };
-        voiceRecorder.onstop = () => {
-          stream.getTracks().forEach(t => t.stop());
-          if (voiceChunks.length === 0) return;
-          const blob = new Blob(voiceChunks, { type: mimeType || 'audio/webm' });
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            const base64 = reader.result;
-            const duration = Math.min((Date.now() - voiceStartTime) / 1000, MAX_VOICE_SEC);
-            const name = document.getElementById('name-input').value.trim() || 'Аноним';
-            push(messagesRef, { name, type: 'voice', audioData: base64, duration, timestamp: Date.now() });
-          };
-          reader.readAsDataURL(blob);
-        };
-        voiceRecorder.start();
-        isVoiceRecording = true;
-        voiceStartTime = Date.now();
-        voiceBtn.classList.add('recording');
-        voiceBtn.textContent = '🔴';
-        micErrorDiv.textContent = '';
-        updateVoiceTimer();
-        voiceTimerInterval = setInterval(updateVoiceTimer, 200);
-        setTimeout(() => { if (isVoiceRecording) stopVoiceRecording(); }, MAX_VOICE_SEC * 1000);
-      } catch (err) {
-        micErrorDiv.textContent = 'Нет доступа к микрофону. Разрешите в настройках браузера.';
-        voiceBtn.classList.remove('recording');
-        voiceBtn.textContent = '🎤';
-        isVoiceRecording = false;
-      }
-    }
-
-    function stopVoiceRecording() {
-      if (!isVoiceRecording || !voiceRecorder || voiceRecorder.state === 'inactive') return;
-      voiceRecorder.stop();
-      isVoiceRecording = false;
-      voiceBtn.classList.remove('recording');
-      voiceBtn.textContent = '🎤';
-      clearInterval(voiceTimerInterval);
-      voiceTimerInterval = null;
-      timerSpan.textContent = '';
-    }
-
-    function updateVoiceTimer() {
-      if (!isVoiceRecording) return;
-      const elapsed = Math.floor((Date.now() - voiceStartTime) / 1000);
-      timerSpan.textContent = `${elapsed}с`;
-    }
-
-    // ---------- ЗАПИСЬ ВИДЕО (КРУЖКИ) ----------
-    let videoRecorder = null;
-    let videoChunks = [];
-    let videoStartTime = 0;
-    let videoTimerInterval = null;
-    let isVideoRecording = false;
-    const MAX_VIDEO_SEC = 30; // ограничение по размеру
-
-    const videoBtn = document.getElementById('video-btn');
-    const camErrorDiv = document.getElementById('cam-error');
-
-    async function startVideoRecording() {
-      if (isVoiceRecording || isVideoRecording) return;
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 320, height: 240, facingMode: 'user' },
-          audio: true
-        });
-        let mimeType = 'video/webm;codecs=vp8,opus';
-        if (!MediaRecorder.isTypeSupported(mimeType)) {
-          mimeType = 'video/webm';
-          if (!MediaRecorder.isTypeSupported(mimeType)) {
-            mimeType = 'video/mp4';
-            if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = '';
-          }
-        }
-        const options = mimeType ? { mimeType } : {};
-        videoRecorder = new MediaRecorder(stream, options);
-        videoChunks = [];
-        videoRecorder.ondataavailable = (e) => { if (e.data.size > 0) videoChunks.push(e.data); };
-        videoRecorder.onstop = () => {
-          stream.getTracks().forEach(t => t.stop());
-          if (videoChunks.length === 0) return;
-          const blob = new Blob(videoChunks, { type: mimeType || 'video/webm' });
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            const base64 = reader.result;
-            const duration = Math.min((Date.now() - videoStartTime) / 1000, MAX_VIDEO_SEC);
-            const name = document.getElementById('name-input').value.trim() || 'Аноним';
-            push(messagesRef, { name, type: 'video', videoData: base64, duration, timestamp: Date.now() });
-          };
-          reader.readAsDataURL(blob);
-        };
-        videoRecorder.start();
-        isVideoRecording = true;
-        videoStartTime = Date.now();
-        videoBtn.classList.add('recording');
-        videoBtn.textContent = '🔴';
-        camErrorDiv.textContent = '';
-        updateVideoTimer();
-        videoTimerInterval = setInterval(updateVideoTimer, 200);
-        setTimeout(() => { if (isVideoRecording) stopVideoRecording(); }, MAX_VIDEO_SEC * 1000);
-      } catch (err) {
-        camErrorDiv.textContent = 'Нет доступа к камере. Разрешите в настройках браузера.';
-        videoBtn.classList.remove('recording');
-        videoBtn.textContent = '📹';
-        isVideoRecording = false;
-      }
-    }
-
-    function stopVideoRecording() {
-      if (!isVideoRecording || !videoRecorder || videoRecorder.state === 'inactive') return;
-      videoRecorder.stop();
-      isVideoRecording = false;
-      videoBtn.classList.remove('recording');
-      videoBtn.textContent = '📹';
-      clearInterval(videoTimerInterval);
-      videoTimerInterval = null;
-      timerSpan.textContent = '';
-    }
-
-    function updateVideoTimer() {
-      if (!isVideoRecording) return;
-      const elapsed = Math.floor((Date.now() - videoStartTime) / 1000);
-      timerSpan.textContent = `${elapsed}с`;
-    }
-
-    // ---------- ОБРАБОТЧИКИ КНОПОК ----------
-    function attachVoiceEvents() {
-      voiceBtn.addEventListener('mousedown', (e) => { e.preventDefault(); startVoiceRecording(); });
-      voiceBtn.addEventListener('mouseup', (e) => { e.preventDefault(); stopVoiceRecording(); });
-      voiceBtn.addEventListener('mouseleave', (e) => { if (isVoiceRecording) stopVoiceRecording(); });
-      voiceBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startVoiceRecording(); });
-      voiceBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopVoiceRecording(); });
-      voiceBtn.addEventListener('touchcancel', (e) => { if (isVoiceRecording) stopVoiceRecording(); });
-    }
-
-    function attachVideoEvents() {
-      videoBtn.addEventListener('mousedown', (e) => { e.preventDefault(); startVideoRecording(); });
-      videoBtn.addEventListener('mouseup', (e) => { e.preventDefault(); stopVideoRecording(); });
-      videoBtn.addEventListener('mouseleave', (e) => { if (isVideoRecording) stopVideoRecording(); });
-      videoBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startVideoRecording(); });
-      videoBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopVideoRecording(); });
-      videoBtn.addEventListener('touchcancel', (e) => { if (isVideoRecording) stopVideoRecording(); });
-    }
-
-    attachVoiceEvents();
-    attachVideoEvents();
-
-    // Enter для отправки текста
-    document.getElementById('msg-input').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') window.sendMessage();
+  function showNotification(msg) {
+    const name = msg.name || 'Аноним';
+    let body = '';
+    if (msg.type === 'voice') body = '🎤 Голосовое сообщение';
+    else if (msg.type === 'video') body = '📹 Видеокружок';
+    else body = msg.text || '';
+    new Notification(name, {
+      body: body,
+      icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">💬</text></svg>',
+      tag: 'chat-msg'
     });
+  }
 
-    function formatDuration(seconds) {
-      seconds = Math.floor(seconds);
-      const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      if (mins > 0) return `${mins}:${secs.toString().padStart(2, '0')}`;
-      return `0:${secs.toString().padStart(2, '0')}`;
-    }
+  window.sendMessage = function() {
+    const nameInput = document.getElementById('name-input');
+    const msgInput = document.getElementById('msg-input');
+    const name = nameInput.value.trim() || 'Аноним';
+    const text = msgInput.value.trim();
+    if (!text) return;
+    push(messagesRef, { name, text, type: 'text', timestamp: Date.now() });
+    msgInput.value = '';
+  };
 
-    function escapeHtml(text) {
-      const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-      return text.replace(/[&<>"']/g, m => map[m]);
+  // ---------- ЗАПИСЬ ГОЛОСА ----------
+  let voiceRecorder, voiceChunks, voiceStartTime, voiceTimerInterval, isVoiceRecording = false;
+  const MAX_VOICE_SEC = 60;
+  const voiceBtn = document.getElementById('voice-btn');
+  const timerSpan = document.getElementById('timer');
+
+  async function startVoice() {
+    if (isVoiceRecording || isVideoRecording) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = selectMimeType('audio');
+      voiceRecorder = new MediaRecorder(stream, { mimeType: mimeType || undefined });
+      voiceChunks = [];
+      voiceRecorder.ondataavailable = e => { if (e.data.size > 0) voiceChunks.push(e.data); };
+      voiceRecorder.onstop = () => {
+        stream.getTracks().forEach(t => t.stop());
+        if (!voiceChunks.length) return;
+        const blob = new Blob(voiceChunks, { type: mimeType || 'audio/webm' });
+        readBlobAsDataURL(blob).then(dataUrl => {
+          const duration = Math.min((Date.now() - voiceStartTime) / 1000, MAX_VOICE_SEC);
+          const name = document.getElementById('name-input').value.trim() || 'Аноним';
+          push(messagesRef, { name, type: 'voice', audioData: dataUrl, duration, timestamp: Date.now() });
+        });
+      };
+      voiceRecorder.start();
+      isVoiceRecording = true;
+      voiceStartTime = Date.now();
+      voiceBtn.classList.add('recording');
+      voiceBtn.textContent = '🔴';
+      timerSpan.textContent = '0с';
+      voiceTimerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - voiceStartTime) / 1000);
+        timerSpan.textContent = `${elapsed}с`;
+      }, 200);
+      setTimeout(() => { if (isVoiceRecording) stopVoice(); }, MAX_VOICE_SEC * 1000);
+    } catch (e) {
+      document.getElementById('mic-error').textContent = 'Нет доступа к микрофону';
     }
-  </script>
+  }
+
+  function stopVoice() {
+    if (!isVoiceRecording || !voiceRecorder || voiceRecorder.state === 'inactive') return;
+    voiceRecorder.stop();
+    isVoiceRecording = false;
+    voiceBtn.classList.remove('recording');
+    voiceBtn.textContent = '🎤';
+    clearInterval(voiceTimerInterval);
+    timerSpan.textContent = '';
+  }
+
+  // ---------- ЗАПИСЬ ВИДЕО (КРУЖКИ) С ПРЕВЬЮ ----------
+  let videoRecorder, videoChunks, videoStartTime, videoTimerInterval, isVideoRecording = false;
+  const MAX_VIDEO_SEC = 25; // уменьшено для безопасности размера
+  const videoBtn = document.getElementById('video-btn');
+  const previewContainer = document.getElementById('preview-container');
+  const previewVideo = document.getElementById('preview-video');
+
+  async function startVideo() {
+    if (isVoiceRecording || isVideoRecording) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: 'user' },
+        audio: true
+      });
+      // Показываем превью
+      previewVideo.srcObject = stream;
+      previewContainer.style.display = 'block';
+
+      const mimeType = selectMimeType('video');
+      const options = { mimeType: mimeType || undefined };
+      // Если браузер поддерживает битрейт, ограничим (не все)
+      if (MediaRecorder.isTypeSupported(mimeType) && 'videoBitsPerSecond' in MediaRecorder.prototype) {
+        options.videoBitsPerSecond = 250000; // 250 кбит/с
+      }
+      videoRecorder = new MediaRecorder(stream, options);
+      videoChunks = [];
+      videoRecorder.ondataavailable = e => { if (e.data.size > 0) videoChunks.push(e.data); };
+      videoRecorder.onstop = () => {
+        stream.getTracks().forEach(t => t.stop());
+        previewVideo.srcObject = null;
+        previewContainer.style.display = 'none';
+        if (!videoChunks.length) return;
+        const blob = new Blob(videoChunks, { type: mimeType || 'video/webm' });
+        readBlobAsDataURL(blob).then(dataUrl => {
+          const duration = Math.min((Date.now() - videoStartTime) / 1000, MAX_VIDEO_SEC);
+          const name = document.getElementById('name-input').value.trim() || 'Аноним';
+          push(messagesRef, { name, type: 'video', videoData: dataUrl, duration, timestamp: Date.now() });
+        });
+      };
+      videoRecorder.start();
+      isVideoRecording = true;
+      videoStartTime = Date.now();
+      videoBtn.classList.add('recording');
+      videoBtn.textContent = '🔴';
+      timerSpan.textContent = '0с';
+      videoTimerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - videoStartTime) / 1000);
+        timerSpan.textContent = `${elapsed}с`;
+      }, 200);
+      setTimeout(() => { if (isVideoRecording) stopVideo(); }, MAX_VIDEO_SEC * 1000);
+    } catch (e) {
+      document.getElementById('cam-error').textContent = 'Нет доступа к камере/микрофону';
+      previewContainer.style.display = 'none';
+    }
+  }
+
+  function stopVideo() {
+    if (!isVideoRecording || !videoRecorder || videoRecorder.state === 'inactive') return;
+    videoRecorder.stop();
+    isVideoRecording = false;
+    videoBtn.classList.remove('recording');
+    videoBtn.textContent = '📹';
+    clearInterval(videoTimerInterval);
+    timerSpan.textContent = '';
+    previewContainer.style.display = 'none';
+  }
+
+  // Вспомогательные функции
+  function selectMimeType(kind) {
+    if (kind === 'audio') {
+      const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
+      return types.find(t => MediaRecorder.isTypeSupported(t)) || '';
+    } else {
+      const types = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm', 'video/mp4'];
+      return types.find(t => MediaRecorder.isTypeSupported(t)) || '';
+    }
+  }
+
+  function readBlobAsDataURL(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  function formatDuration(sec) {
+    sec = Math.floor(sec);
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }
+
+  function escapeHtml(text) {
+    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+    return text.replace(/[&<>"']/g, m => map[m]);
+  }
+
+  // Привязка событий кнопок записи
+  function bindRecord(btn, startFn, stopFn) {
+    btn.addEventListener('mousedown', e => { e.preventDefault(); startFn(); });
+    btn.addEventListener('mouseup', e => { e.preventDefault(); stopFn(); });
+    btn.addEventListener('mouseleave', e => { if (btn.classList.contains('recording')) stopFn(); });
+    btn.addEventListener('touchstart', e => { e.preventDefault(); startFn(); });
+    btn.addEventListener('touchend', e => { e.preventDefault(); stopFn(); });
+    btn.addEventListener('touchcancel', e => { if (btn.classList.contains('recording')) stopFn(); });
+  }
+  bindRecord(voiceBtn, startVoice, stopVoice);
+  bindRecord(videoBtn, startVideo, stopVideo);
+
+  // Отправка по Enter
+  document.getElementById('msg-input').addEventListener('keypress', e => {
+    if (e.key === 'Enter') window.sendMessage();
+  });
+</script>
 </body>
 </html>
