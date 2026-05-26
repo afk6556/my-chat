@@ -247,17 +247,23 @@
       try {
         const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY });
         if (currentToken) {
-          console.log('FCM Token:', currentToken);
-          // Здесь можно сохранить токен в базу, если нужно отправлять таргетированные уведомления
-        } else {
-          console.log('Нет разрешения на получение токена.');
-        }
-      } catch (err) {
-        console.error('Ошибка получения токена:', err);
-      }
-    }
-  }
-
+  console.log('FCM Token:', currentToken);
+  // Временно покажем токен на экране
+  const tokenDisplay = document.createElement('div');
+  tokenDisplay.id = 'fcm-token-display';
+  tokenDisplay.style.cssText = 'position:fixed; bottom:20px; left:20px; right:20px; background:#fff; padding:10px; border:2px solid #667eea; border-radius:12px; word-break:break-all; z-index:9999; font-size:12px;';
+  tokenDisplay.innerHTML = `<b>Твой токен (скопируй его):</b><br><span id="token-text">${currentToken}</span><br><button id="copy-token-btn" style="margin-top:6px; padding:6px 12px; background:#667eea; color:white; border:none; border-radius:8px;">Скопировать токен</button>`;
+  document.body.appendChild(tokenDisplay);
+  
+  document.getElementById('copy-token-btn').addEventListener('click', () => {
+    const tokenText = document.getElementById('token-text').innerText;
+    navigator.clipboard.writeText(tokenText).then(() => {
+      alert('Токен скопирован! Теперь вставь его в Firebase Console.');
+    }).catch(() => {
+      alert('Не удалось скопировать. Пожалуйста, выдели и скопируй токен вручную.');
+    });
+  });
+}
   function updateNotifUI() {
     notifToggle.classList.toggle('active', notificationsEnabled);
     notifToggle.innerHTML = notificationsEnabled ? '🔔' : '🔕';
