@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Мессенджер</title>
+  <title>Мессенджер с Push</title>
   <link rel="manifest" href="manifest.json">
   <style>
+    /* Стили остались без изменений */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Segoe UI', system-ui, sans-serif;
@@ -72,6 +73,7 @@
     .bubble {
       background: white; padding: 12px 16px; border-radius: 20px 20px 20px 4px;
       box-shadow: 0 2px 12px rgba(0,0,0,0.08); max-width: 75%; word-wrap: break-word;
+      position: relative;
     }
     .bubble .sender { font-weight: 600; color: #667eea; margin-bottom: 4px; font-size: 14px; }
     .bubble .text { color: #2d3436; font-size: 15px; line-height: 1.4; }
@@ -79,6 +81,11 @@
       display: block; margin-top: 6px; width: 100%; border-radius: 12px; outline: none;
     }
     .bubble .duration { font-size: 12px; color: #888; margin-left: 6px; }
+    .msg-time {
+      font-size: 11px; color: #999; text-align: right; margin-top: 4px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .msg-date { font-size: 10px; color: #bbb; }
 
     .input-area {
       background: white; padding: 15px 20px; border-top: 1px solid #f0f0f0;
@@ -116,7 +123,7 @@
 <div id="auth-screen">
   <h2>Вход / Регистрация</h2>
   <input type="email" id="auth-email" placeholder="Email">
-  <input type="password" id="auth-password" placeholder="Пароль">
+  <input type="password" id="auth-password" placeholder="Пароль (минимум 6 символов)">
   <button id="auth-action-btn">Войти</button>
   <span class="auth-link" id="switch-auth">Нет аккаунта? Зарегистрироваться</span>
   <div class="auth-error" id="auth-error"></div>
@@ -145,9 +152,10 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
   import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+  import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-messaging.js";
 
-  // =========== ВСТАВЬ СВОЙ КОНФИГ ===========
-   const firebaseConfig = {
+  // =========== 1. ВСТАВЬ СВОЙ КОНФИГ ===========
+    const firebaseConfig = {
   apiKey: "AIzaSyAlnrJNNmsfH2NhphvYN50i_GtlSgGUC30",
   authDomain: "fftf-6d8d0.firebaseapp.com",
   databaseURL: "https://fftf-6d8d0-default-rtdb.europe-west1.firebasedatabase.app",
@@ -158,9 +166,14 @@
 };
   // ==========================================
 
+  // =========== 2. ВСТАВЬ СВОЙ VAPID-КЛЮЧ ===========
+  const VAPID_KEY = "BOp0CRKrufpXzJyyuSDMeGuv3_hNzOwecj8V_e9MriTdFpZ52efFiTKuY5VO25nW3SdQPg4DGFaPZSO9dVgG978";
+  // ==================================================
+
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
   const auth = getAuth(app);
+  const messaging = getMessaging(app);
 
   // ---------- Аутентификация ----------
   let currentUser = null;
@@ -201,12 +214,13 @@
     } catch (err) { authError.textContent = err.message; }
   });
 
-  onAuthStateChanged(auth, (user) => {
+  onAuthStateChanged(auth, async (user) => {
     if (user) {
       currentUser = user;
       authScreen.style.display = 'none';
       messengerScreen.style.display = 'flex';
       userDisplayName.textContent = user.email.split('@')[0];
+      await requestPushPermission();
       startChat();
     } else {
       currentUser = null;
@@ -217,15 +231,39 @@
 
   logoutBtn.addEventListener('click', () => signOut(auth));
 
-  // ---------- Уведомления ----------
+  // ---------- Push-уведомления ----------
   const notifToggle = document.getElementById('notif-toggle');
   const notifStorageKey = 'notifications_enabled';
   let notificationsEnabled = localStorage.getItem(notifStorageKey) !== 'false';
+
+  async function requestPushPermission() {
+    if ('Notification' in window && Notification.permission === 'default') {
+      const perm = await Notification.requestPermission();
+      notificationsEnabled = perm === 'granted';
+      localStorage.setItem(notifStorageKey, notificationsEnabled.toString());
+      updateNotifUI();
+    }
+    if (notificationsEnabled) {
+      try {
+        const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY });
+        if (currentToken) {
+          console.log('FCM Token:', currentToken);
+          // Здесь можно сохранить токен в базу, если нужно отправлять таргетированные уведомления
+        } else {
+          console.log('Нет разрешения на получение токена.');
+        }
+      } catch (err) {
+        console.error('Ошибка получения токена:', err);
+      }
+    }
+  }
+
   function updateNotifUI() {
     notifToggle.classList.toggle('active', notificationsEnabled);
     notifToggle.innerHTML = notificationsEnabled ? '🔔' : '🔕';
   }
   updateNotifUI();
+
   notifToggle.addEventListener('click', async () => {
     if (notificationsEnabled) {
       notificationsEnabled = false;
@@ -240,8 +278,21 @@
       }
       notificationsEnabled = true;
       localStorage.setItem(notifStorageKey, 'true');
+      await requestPushPermission();
     }
     updateNotifUI();
+  });
+
+  // Обработчик сообщений, когда приложение открыто
+  onMessage(messaging, (payload) => {
+    console.log('Сообщение получено: ', payload);
+    const notificationTitle = payload.notification.title;
+    const notificationOptions = {
+      body: payload.notification.body,
+      icon: '/my-chat/icon.png',
+      vibrate: [200, 100, 200],
+    };
+    new Notification(notificationTitle, notificationOptions);
   });
 
   // ---------- Чат ----------
@@ -252,9 +303,10 @@
     onChildAdded(messagesRef, (snapshot) => {
       const msg = snapshot.val();
       displayMessage(msg);
-      if (document.hidden && notificationsEnabled && Notification.permission === 'granted') {
-        showNotification(msg);
-      }
+      // Локальные уведомления больше не нужны, т.к. используются push
+      // if ((document.hidden || !document.hasFocus()) && notificationsEnabled && Notification.permission === 'granted') {
+      //   showNotification(msg);
+      // }
     });
   }
 
@@ -279,6 +331,10 @@
     } else {
       content += `<div class="text">${escapeHtml(msg.text || '')}</div>`;
     }
+
+    const timeStr = msg.timestamp ? formatTime(msg.timestamp) : '';
+    content += `<div class="msg-time"><span></span><span>${timeStr}</span></div>`;
+
     bubble.innerHTML = content;
     msgDiv.appendChild(avatar);
     msgDiv.appendChild(bubble);
@@ -286,10 +342,16 @@
     container.scrollTop = container.scrollHeight;
   }
 
-  function showNotification(msg) {
-    const name = msg.displayName || msg.name || 'Аноним';
-    const body = msg.type === 'voice' ? '🎤 Голосовое сообщение' : (msg.text || '');
-    new Notification(name, { body, icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">💬</text></svg>', tag: 'chat-msg' });
+  function formatTime(timestamp) {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const time = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    if (date.toDateString() === now.toDateString()) {
+      return time;
+    } else {
+      const dateStr = date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+      return `${dateStr}, ${time}`;
+    }
   }
 
   window.sendMessage = function() {
@@ -397,7 +459,7 @@
     if (e.key === 'Enter') window.sendMessage();
   });
 
-  // Регистрация сервис-воркера (для PWA)
+  // Регистрация сервис-воркера для PWA (оставляем)
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/my-chat/sw.js')
       .catch(err => console.log('SW не зарегистрирован', err));
